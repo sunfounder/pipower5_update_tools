@@ -1,380 +1,32 @@
 import os
-import sys
 import time
-from i2c import I2C
 from ui_tools import UiTools
+import traceback
+from iap import *
 
 # change working directory to script directory
 file_path = os.path.abspath(__file__)
 file_dir = os.path.dirname(file_path)
 os.chdir(file_dir)
 
-#
-FIRMWARE_MAX_BYTES = 24*1024 # 24K
+
 firmware_files = []
-for root, dirs, files in os.walk("."):
+FIRMWARE_DIR = "firmware"
+for root, dirs, files in os.walk(FIRMWARE_DIR):
+    # print(root, dirs, files)
     for file in files:
         if file.endswith(".bin"):
-            firmware_files.append(os.path.join(root, file))
+            full_path = os.path.join(root, file)
+            relative_path = os.path.relpath(full_path, FIRMWARE_DIR)
+            firmware_files.append(relative_path)
 firmware_num = len(firmware_files)
 chosen_firmware_index = 0
 
-# 
-APP_I2C_ADDR = 0x5c
-BOOT_I2C_ADDR = 0x5d
+# print("Firmware files:")
+# for i in range(firmware_num):
+#     print(f"{i}: {firmware_files[i]}")
+# exit()
 
-app_i2c = I2C(addr=APP_I2C_ADDR, bus=1)
-boot_i2c = I2C(addr=BOOT_I2C_ADDR, bus=1)
-
-APP_VERSION_REG_ADDR = 128 # 128: major, 129: minor, 130, patch                                                                     |
-BOOT_VERSION_REG_ADDR = 173 # 173: major, 174: minor, 175, patch
-FACTORY_VERSION_REG_ADDR = 176 # 176: major, 177: minor, 178, patch
-APP_ENTRY_REG_ADDR = 179 # 179~182 (32bit)     
-MIAN_ENTRY_REG_ADDR = 183 # 183~186 (32bit)
-
-BOOT_VERSION_REG_ADDR_BOOT = 0
-FACTORY_VERSION_REG_ADDR_BOOT = 3
-APP_VERSION_REG_ADDR_BOOT = 6
-BOOT_MODE_BOOT = 9
-APP_ENTRY_REG_ADDR_BOOT = 10
-MIAN_ENTRY_REG_ADDR_BOOT = 14
-# =============================================================
-# Enter boot mode
-# | start | cmd | value | end |
-# | ----- | --- | ------| --- |
-# | 0     | 1   | 2     | 3   |
-# - start：0xAC （I2C 高级指令）
-# - cmd：0x04 （进入升级模式）
-# - value：0x01 （True）
-# - end：0xAE （结束）
-
-ADV_CMD_START = 0xAC
-ADV_CMD_END = 0xAE
-ADV_CMD_OK = 0xE0
-ADV_CMD_ERR = 0xEF
-
-ADV_CMD_RST = 0x00
-ADV_CMD_ENTER_BOOT = 0x04
-
-FACTORY_APP_MODE = 0
-NEW_APP_MODE = 1
-UPDATE_MODE = 2
-
-NEW_APP_START = 0x08008000
-# =============================================================
-# IAP
-# -------------
-# ---------- Ack -------------
-# | start | cmd | value | end |
-# | ----- | --- | ------| --- |
-# | 0     | 1   | 2     | 3   |
-# - start：0xD0 （IAP command）
-# - cmd：0xAC （ACK）
-# - value：0x01 （True）
-# - end：0xAE （end）
-
-# ---------- Header ----------
-# start | len | check_sum | firmware_size(2bytes, Big) | page_num | end
-# - start: 0xDC
-# - len: 3, firmware_size + page_num
-# - check_sum:  check_sum of firmware_size and page_num
-# - firmware_size: 2 bytes, Big endian
-# - page_num: number of pages to be written (each page is 1K)
-# - end: 0xED
-
-
-PAGE_SIZE = 1024 # 1K
-IAP_DATA_LEN = 24 # 4bytes aligned
-IAP_RETRY_TIMES= 5
-
-IAP_CMD_START = 0xD0
-IAP_CMD_END = 0xED
-
-IAP_CMD_ACK = 0xAC
-IAP_CMD_RST = 0xAE
-IAP_CMD_EARSE = 0xDC
-IAP_CMD_WRITE = 0xDD
-IAP_CMD_VERIFY = 0xDE
-IAP_CMD_RST_FACTORY = 0xDF
-
-IAP_OK = 0xE0
-IAP_FAIL = 0xEF
-IAP_CHECKSUM_ERR = 0xE1
-IAP_SIZE_ERR = 0xE2
-IAP_FLASH_ERR = 0xE3
-IAP_4BYTES_ALIGN_ERR = 0xE4
-IAP_DATA_ERR = 0xE5
-
-IAP_NACK_ERR = 0xFF
-
-# =============================================================
-def check_boot_mode():
-    if boot_i2c.is_ready():
-        st = time.time()
-        while time.time() - st < 5:
-            # send ack
-            boot_i2c._write_block_data(IAP_CMD_START, [IAP_CMD_ACK, 1, IAP_CMD_END])
-            status = boot_i2c._read_byte()
-            if status == IAP_OK:
-                return True
-            time.sleep(0.01)
-        else:
-            return False
-    else:
-        return False
-
-def get_boot_verion():
-    if app_i2c.is_ready():
-        result = app_i2c._read_block_data(BOOT_VERSION_REG_ADDR, 3)
-    elif boot_i2c.is_ready():
-        result = boot_i2c._read_block_data(BOOT_VERSION_REG_ADDR_BOOT, 3)
-    else:
-        return None
-
-    major = result[0]
-    minor = result[1]
-    patch = result[2]
-
-    return f"{major}.{minor}.{patch}"
-
-def get_app_verion():
-    if app_i2c.is_ready():
-        result = app_i2c._read_block_data(APP_VERSION_REG_ADDR, 3)
-    elif boot_i2c.is_ready():
-        result = boot_i2c._read_block_data(APP_VERSION_REG_ADDR_BOOT, 3)
-    else:
-        return None
-
-    major = result[0]
-    minor = result[1]
-    patch = result[2]
-    return f"{major}.{minor}.{patch}"
-
-def get_factory_verion():
-    if app_i2c.is_ready():
-        result = app_i2c._read_block_data(FACTORY_VERSION_REG_ADDR, 3)
-    elif boot_i2c.is_ready():
-        result = boot_i2c._read_block_data(FACTORY_VERSION_REG_ADDR_BOOT, 3)
-    else:
-        return None
-
-    major = result[0]
-    minor = result[1]
-    patch = result[2]
-    return f"{major}.{minor}.{patch}"
-
-def get_main_entry():
-    if app_i2c.is_ready():
-        result =  app_i2c._read_block_data(MIAN_ENTRY_REG_ADDR, 4)
-    elif boot_i2c.is_ready():
-        result =  boot_i2c._read_block_data(MIAN_ENTRY_REG_ADDR_BOOT, 4)
-    else:
-        return None
-    
-    result = result[3] << 24 | result[2] << 16 | result[1] << 8 | result[0]
-    return f'0x{result:08X}'
-
-def get_app_entry():
-    if app_i2c.is_ready():
-        result =  app_i2c._read_block_data(APP_ENTRY_REG_ADDR, 4)
-    elif boot_i2c.is_ready():
-        result =  boot_i2c._read_block_data(APP_ENTRY_REG_ADDR_BOOT, 4)
-    else:
-        return None
-    
-    result = result[3] << 24 | result[2] << 16 | result[1] << 8 | result[0]
-    return f'0x{result:08X}'
-
-def enter_boot_mode():
-    app_i2c._write_block_data(ADV_CMD_START, [ADV_CMD_ENTER_BOOT, 1, ADV_CMD_END])
-    status = app_i2c._read_byte()
-    if status != IAP_OK:
-        return False
-    # wait for device to enter iap mode, i2c change to 0x5d
-    time.sleep(1)
-    st = time.time()
-    while time.time() - st < 5:
-        if boot_i2c.is_ready():
-           # send ack
-           boot_i2c._write_block_data(IAP_CMD_START, [IAP_CMD_ACK, 1, IAP_CMD_END])
-           status = boot_i2c._read_byte()
-           if status == IAP_OK:
-               return True
-           time.sleep(0.01)
-    else:
-        return False
-
-
-def app_reset_device():
-    for _ in range(IAP_RETRY_TIMES):
-        app_i2c._write_block_data(ADV_CMD_START, [ADV_CMD_RST, 1, ADV_CMD_END])
-        status = app_i2c._read_byte()
-        if status == IAP_OK:
-            return True
-    else:
-        return False
-
-def boot_reset_device():
-    for _ in range(IAP_RETRY_TIMES):
-        boot_i2c._write_block_data(IAP_CMD_START, [IAP_CMD_RST, 1, IAP_CMD_END])
-        status = boot_i2c._read_byte()
-        if status == IAP_OK:
-            return True
-    else:
-        return False
-
-
-def reset_device():
-    if app_i2c.is_ready():
-        return  app_reset_device()
-    elif boot_i2c.is_ready():
-        return boot_reset_device()
-    else:
-        return False
-    
-
-def earse_flash(file_size):
-    # | start | cmd | checksum | len | addr             | page_num     | end |
-    # | ----- | --- | -------- | --- | ---------------- | ------------- | --- |
-    # | 0     | 1   | 2        | 3   | 4~7 （u32, Big） | 8~9(u16, Big) | 10  |
-    check_sum = 0
-    _len = 6 
- 
-    if file_size % PAGE_SIZE != 0:
-        page_num = file_size // PAGE_SIZE + 1
-    else:
-        page_num = file_size // PAGE_SIZE
-    page_num = page_num.to_bytes(2, 'big')
-    page_num = list(page_num)
-
-    addr = NEW_APP_START
-    addr = addr.to_bytes(4, 'big')
-    addr = list(addr)
-
-    for x in addr:
-        check_sum ^= x
-    for x in page_num:
-        check_sum ^= x
-
-
-    _send_data = [IAP_CMD_START, IAP_CMD_EARSE, check_sum, _len] + addr + page_num + [IAP_CMD_END]
-
-    for _ in range(IAP_RETRY_TIMES):
-        boot_i2c._write_block_data(_send_data[0], _send_data[1:])
-        _st = time.time()
-        status = IAP_NACK_ERR
-        while time.time() - _st < 5:
-            try:
-                status = boot_i2c._read_byte()
-                break
-            except TimeoutError:
-                pass
-            time.sleep(0.01)
-        
-        # print(f"\nearse status: {status:#02x}")
-        # print(f"page_num: {page_num}")
-        if status == IAP_OK:
-            return True
-    else:
-        return False
-
-def burn_data(data, data_offset):
-    # | start | cmd | checksum | len  | data_offset    | data | end |
-    # | ----- | --- | -------- | ---- | -------------- | ---- | --- |
-    # | 0     | 1   | 2        | 3    | 4~5（u16,Big） | 6... | -1  |
-    check_sum = 0
-    
-    # 4 bytes aligned
-    data_len = len(data) 
-    if data_len % 4 != 0:
-        data += [0xFF]*(4-(data_len%4))
-
-    #
-    data_len = len(data)
-    _len = data_len + 2 # data_offset + data
-
-    data_offset = data_offset.to_bytes(2, 'big')
-    data_offset = list(data_offset)
-    
-    for x in data_offset:
-        check_sum ^= x
-    for x in data:
-        check_sum ^= x
-
-    _send_data = [IAP_CMD_START, IAP_CMD_WRITE, check_sum, _len] + data_offset + data + [IAP_CMD_END]
-    ui.clear_xline(ui._height)
-    ui.clear_xline(ui._height+1)
-    _send_data_hex = ""
-    for x in _send_data:
-        _send_data_hex += f"{x:02X}, "
-    _send_data_hex = _send_data_hex[:-2]
-    ui.draw(f"send_data: {_send_data_hex}", location=(0, ui._height))
-
-    status = IAP_NACK_ERR 
-    for _ in range(IAP_RETRY_TIMES):
-        boot_i2c._write_block_data(_send_data[0], _send_data[1:])
-        _st = time.time()
-        status = IAP_NACK_ERR
-        while time.time() - _st < 5:
-            try:
-                status = boot_i2c._read_byte()
-                break
-            except TimeoutError:
-                pass
-            time.sleep(0.01)
-
-        # print(f"\nburn status: {status:#02x}")
-
-        # if status == IAP_OK:
-        #     return True
-        return status
-    else:
-        return status
-    
-def verify_data(data):
-    # | start | cmd | checksum | len | addr          | size          | flash_checksum | end |
-    # | ----- | --- | -------- | --- | ------------- | ------------- | -------------- | --- |
-    # | 0     | 1   | 2        | 3   | 4~7 (u32,Big) | 8~9 (u16,Big) | 10             | 11  |
-    check_sum = 0
-    _len = 7 # addr + size + flash_checksum
-
-    # addr
-    addr = NEW_APP_START
-    addr = addr.to_bytes(4, 'big')
-    addr = list(addr)
-    # size
-    firmware_check_sum = 0
-    firmware_size = len(data).to_bytes(2, 'big')
-    firmware_size = list(firmware_size)
-    # flash_checksum
-    for x in data:
-        firmware_check_sum ^= x
-    # checksum
-    for x in addr:
-        check_sum ^= x
-    for x in firmware_size:
-        check_sum ^= x
-    check_sum ^= firmware_check_sum
-    #
-    _send_data = [IAP_CMD_START, IAP_CMD_VERIFY, check_sum, _len] + addr + firmware_size + [firmware_check_sum] + [IAP_CMD_END]
-    boot_i2c._write_block_data(_send_data[0], _send_data[1:])
-    status = boot_i2c._read_byte()
-    if status == IAP_OK:
-        return True
-    else:
-        return False
-
-def restore_factory_firmware():
-    # | start | cmd | value | end |
-    # | ----- | --- | ------| --- |
-    # | 0     | 1   | 2     | 3   |
-    for _ in range(IAP_RETRY_TIMES):
-        boot_i2c._write_block_data(IAP_CMD_START, [IAP_CMD_RST_FACTORY, 1, IAP_CMD_END])
-        status = boot_i2c._read_byte()
-        if status == IAP_OK:
-            return True
-    else:
-        return False
 
 # UI
 # ==============================================================================
@@ -406,17 +58,24 @@ def get_basic_info():
     boot_version = get_boot_verion()
     app_version = get_app_verion()
     factory_version = get_factory_verion()
-    app_entry = get_app_entry()
     main_entry = get_main_entry()
 
-def display_basic_info(location=(UI_WIDTH-24, 8)):
+def display_basic_info(location=(UI_WIDTH-24, 9)):
     ui.draw(f"Boot Version: {boot_version}", location=location)
     ui.draw(f"App Version: {app_version}", location=(location[0], location[1]+1))
     ui.draw(f"Factory Version: {factory_version}", location=(location[0], location[1]+2))
-    ui.draw(f"App Entry: {app_entry}", location=(location[0], location[1]+3))
-    ui.draw(f"Main Entry: {main_entry}", location=(location[0], location[1]+4))
+    ui.draw(f"Main Entry: {main_entry}", location=(location[0], location[1]+3))
+
+def display_currnet_mode(location=(UI_WIDTH-24, 7)):
+    if boot_i2c.is_ready():
+        ui.draw(f" Current Mode: Boot ", color=ui.white_on_green, location=location)
+    elif app_i2c.is_ready():
+        ui.draw(f" Current Mode: App ", color=ui.white_on_green, location=location)
+    else:
+        ui.draw(f" Disconnected ", color=ui.white_on_red, location=location)
 
 # -----------------------------------------------------------------
+TITLE = "I2C IAP for Fusion HAT+"
 OPERATIONS = [
     " Update Firmware",
     " Restore Factory Firmware",
@@ -432,11 +91,13 @@ def select_operation_handler():
     # clear screen
     print(f"{ui.home}{ui.THEME_BGROUND_COLOR}{ui.clear}")
     # draw title
-    ui.draw_title("I2C IAP for Pipower5")
+    ui.draw_title(TITLE)
     # draw options tips
     ui.draw(OPTIONS_TIPS['content'], location=OPTIONS_TIPS['location'])
+    # draw current mode
+    display_currnet_mode(location=(UI_WIDTH-24, 7))
     # draw basic info
-    display_basic_info(location=(UI_WIDTH-24, 8))
+    display_basic_info(location=(UI_WIDTH-24, 9))
 
     # draw options
     ui.draw_options(OPERATIONS, operation, location=(2, 2), box_width=35)
@@ -505,14 +166,16 @@ def select_firmware_handler():
     ui.draw_title("select firmware")
     # draw options tips
     ui.draw(OPTIONS_TIPS['content'], location=OPTIONS_TIPS['location'])
+    # draw current mode
+    display_currnet_mode(location=(UI_WIDTH-24, 7))
     # draw basic info
-    display_basic_info(location=(UI_WIDTH-24, 8))
+    display_basic_info(location=(UI_WIDTH-24, 9))
 
     # draw options
     if firmware_num > 0:
         _files  = firmware_files[options_offset:options_offset+OPTIONS_LIST_NUM]
         ui.draw_options(_files, chosen_firmware_index-options_offset, location=(2, 2), box_width=35)
-        ui.draw(f"{chosen_firmware_index+1}/{firmware_num}", location=(38, 2), box_width=7, align='right')
+        ui.draw(f"{chosen_firmware_index+1}/{firmware_num}", location=(45, 2), box_width=7, align='right')
     else:
         ui.draw("  No firmware found.", location=(5, 3))
         key = ui.inkey()
@@ -526,7 +189,7 @@ def select_firmware_handler():
             chosen_firmware_index = (chosen_firmware_index + 1) % firmware_num
         elif key.name == 'KEY_ENTER':
             chosen_file = firmware_files[chosen_firmware_index]
-            return chosen_file
+            return f"{FIRMWARE_DIR}/{chosen_file}"
         elif key.name == 'KEY_ESCAPE':
             exit()
         else:
@@ -540,7 +203,7 @@ def select_firmware_handler():
             options_offset = chosen_firmware_index
             _files  = firmware_files[options_offset:options_offset+OPTIONS_LIST_NUM]
         ui.draw_options(_files, chosen_firmware_index-options_offset, location=(2, 2), box_width=35)
-        ui.draw(f"{chosen_firmware_index+1}/{firmware_num}", location=(38, 2), box_width=7, align='right')
+        ui.draw(f"{chosen_firmware_index+1}/{firmware_num}", location=(45, 2), box_width=7, align='right')
 
 #
 def burn_firmware_handler(file_path):
@@ -549,10 +212,12 @@ def burn_firmware_handler(file_path):
     # draw title
     ui.draw_title("burn firmware")
     #
-    ui.draw(f"firmware: {file_path}", location=(2, 2))
-    # check file
     file_size = os.path.getsize(file_path)
-    ui.draw(f"    size: {file_size} bytes", location=(2, 3))
+    # 
+    _file_str = [f"firmware: {file_path}", ]
+    _file_str += [f"size: {file_size} bytes"]
+    ui.draw(_file_str, location=(2, 2), box_width=50)
+    # check file
     if file_size > FIRMWARE_MAX_BYTES:
         ui.draw([
                 "",
@@ -560,7 +225,7 @@ def burn_firmware_handler(file_path):
                 "",
                 " press any key to exit. "
                 ],
-                color=ui.THEME_CHOSEN_COLOR,
+                color=ui.black_on_yellow,
                 location=(15, 5),
                 box_width=50,
                 align='center'
@@ -568,8 +233,10 @@ def burn_firmware_handler(file_path):
         ui.inkey()
         return
 
+    # draw current mode
+    display_currnet_mode(location=(UI_WIDTH-24, 7))
     # display basic info
-    display_basic_info(location=(UI_WIDTH-24, 8))
+    display_basic_info(location=(UI_WIDTH-24, 9))
 
     # burn firmware
     # ----------------------------------------------------------------------------
@@ -626,7 +293,7 @@ def burn_firmware_handler(file_path):
         else:
             send_data = data[data_offset:data_offset+IAP_DATA_LEN]
         #
-        _status = burn_data(send_data, data_offset)
+        _status = burn_data(ui, send_data, data_offset)
         if _status == IAP_OK:
             data_offset += IAP_DATA_LEN
             if data_offset > data_len:
@@ -775,6 +442,7 @@ def reset_device_handller():
     ui.inkey()
           
 #
+# =============================================================
 def loop():
     while True:
         get_basic_info()
@@ -798,11 +466,26 @@ def loop():
                 reset_device_handller()
 
 def main():
+    track_str = ""
     with ui.fullscreen(), ui.cbreak():
         try:
             loop()
         except KeyboardInterrupt:
             pass
+        except Exception as e:
+            track_str = traceback.format_exc()
+            ui.draw( [
+                f"error: {e}",
+                # f"{traceback.format_exc()}",
+                "",
+                " press any key to exit. "
+                ],
+                color=ui.white_on_red,
+                location=(5, 5),
+                box_width=70,
+                align='left'
+                )
+            ui.inkey()
         finally:
             if boot_i2c.is_ready():
                 opt = ui.draw_ask([
@@ -817,6 +500,7 @@ def main():
                 )
                 if opt is True:
                     reset_device_handller()
+    print(track_str)
 
 if __name__ == "__main__":
     main()
