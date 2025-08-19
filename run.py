@@ -88,6 +88,12 @@ RESET_MODE = 2
     
 def select_operation_handler():
     operation = 0
+    
+    # get basic info
+    get_basic_info()
+
+
+
     # clear screen
     print(f"{ui.home}{ui.THEME_BGROUND_COLOR}{ui.clear}")
     # draw title
@@ -159,6 +165,9 @@ def select_firmware_handler():
 
     # 
     OPTIONS_LIST_NUM = 8
+
+    # get basic info
+    get_basic_info()
 
     # clear screen
     print(f"{ui.home}{ui.THEME_BGROUND_COLOR}{ui.clear}")
@@ -445,7 +454,6 @@ def reset_device_handller():
 # =============================================================
 def loop():
     while True:
-        get_basic_info()
         operation = select_operation_handler()
         if operation == UPATE_MODE:
             update_mdoe_handler()
