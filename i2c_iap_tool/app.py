@@ -1,6 +1,7 @@
 import os
 import time
 import traceback
+import subprocess
 
 from .ui_tools import UiTools
 from .iap import Iap
@@ -26,6 +27,8 @@ firmware_num = len(firmware_files)
 # for i in range(firmware_num):
 #     print(f"{i}: {firmware_files[i]}")
 # exit()
+
+
 
 
 UI_WIDTH = 80
@@ -54,6 +57,44 @@ UPATE_MODE = 0
 RESTORE_MODE = 1
 RESET_MODE = 2
 
+# -----------------------------------------------------------------
+CONFLICT_SERVICES = [
+    "pipower5.service",
+    "pironman5.service",
+]
+
+
+def is_service_active(service_name):
+    try:
+        result = subprocess.run(
+            ['sudo', 'systemctl', 'is-active', '--quiet', service_name],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        if result.returncode == 0:
+            return True
+        else:
+            return False
+    except Exception as e:
+        return None
+
+def stop_service(service_name):
+    try:
+        result = subprocess.run(
+            ['sudo', 'systemctl', 'stop', service_name],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        if result.returncode == 0:
+            return True
+        else:
+            return False
+    except Exception as e:
+        return None
 
 # -----------------------------------------------------------------
 class IapToolApp:
@@ -450,11 +491,96 @@ class IapToolApp:
                     align='center'
             )
         self.ui.inkey()
-            
+
+    def check_conflict_service_hanlder(self):
+        _active_conflict_service = []
+        for _service in CONFLICT_SERVICES:
+            if is_service_active(_service):
+                _active_conflict_service.append(_service)
+        if len(_active_conflict_service) > 0:
+            # ----
+            operation = 0
+            # get basic info
+            self.get_basic_info()
+
+            # clear screen
+            print(f"{self.ui.home}{self.ui.THEME_BGROUND_COLOR}{self.ui.clear}")
+            # draw title
+            self.ui.draw_title(f"I2C IAP for {self.globals['NAME']}")
+            # draw options tips
+            self.ui.draw(OPTIONS_TIPS['content'], location=OPTIONS_TIPS['location'])
+            # draw current mode
+            self.display_currnet_mode(location=(UI_WIDTH-24, 7))
+            # draw basic info
+            self.display_basic_info(location=(UI_WIDTH-24, 9))
+
+            # draw options
+            self.ui.draw_options(OPERATIONS, operation, location=(2, 2), box_width=35)
+
+            # -----
+            opt = self.ui.draw_ask([
+                    "Detected services that may cause I2C conflicts. ",
+                    f"{_active_conflict_service}",
+                    "Do you want to close them? [y/n]",
+                    "",
+                    ],
+                    color=self.ui.white_on_yellow,
+                    location=(15, 5),
+                    box_width=50,
+                    align='center'
+            )
+            if opt is True:
+                self.ui.draw([
+                    "",
+                    "Stopping services... ",
+                    "",
+                    "",
+                    ],
+                    color=self.ui.white_on_yellow,
+                    location=(15, 5),
+                    box_width=50,
+                    align='center'
+                )
+                _cannot_stop_service = []
+                for _service in _active_conflict_service:
+                    _status = stop_service(_service)
+                    if _status is False:
+                        _cannot_stop_service.append(_service)
+                if len(_cannot_stop_service) > 0:
+                    self.ui.draw([
+                        "Some services cannot be stopped. ",
+                        f"{_cannot_stop_service}",
+                        "Please close the conflict services manually to continue.",
+                        "",
+                        " press any key to exit. "
+                        ],
+                        color=self.ui.white_on_red,
+                        location=(15, 5),
+                        box_width=50,
+                        align='center'
+                    )
+                    self.ui.inkey()
+                    exit(0)
+
+            else:
+                self.ui.draw([
+                    "Please close the conflict services to continue. ",
+                    "",
+                    " press any key to exit. ",
+                    "",
+                    ],
+                    color=self.ui.black_on_gray,
+                    location=(15, 5),
+                    box_width=50,
+                    align='center'
+                )
+                self.ui.inkey()
+                exit(0)
     #
     # =============================================================
     def loop(self):
         while True:
+            self.check_conflict_service_hanlder()
             operation = self.select_operation_handler()
             if operation == UPATE_MODE:
                 self.update_mdoe_handler()
