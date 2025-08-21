@@ -8,7 +8,7 @@ I2C IAP tools for PiPower5
 ## Install depencies
 
 ```
-git clone https://github.com/zhuyaliang/pipower5_update.git --depth 1
+git clone https://github.com/sunfounder/pipower5_update_tools.git --depth 1
 
 sudo pip3 install blessed --break
 sudo pip3 install smbus2 --break
