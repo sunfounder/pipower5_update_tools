@@ -261,6 +261,19 @@ class IapToolApp:
         _file_str += [f"size: {file_size} bytes"]
         self.ui.draw(_file_str, location=(2, 2), box_width=50)
         # check file
+        if file_size < 1000:
+            self.ui.draw([
+                    f"error: file size is too small, please check the file. ",
+                    f"file_size: {file_size} bytes",
+                    " press any key to exit. "
+                    ],
+                    color=self.ui.black_on_yellow,
+                    location=(15, 5),
+                    box_width=50,
+                    align='center'
+            )
+            self.ui.inkey()
+            return
         if file_size > self.globals["FIRMWARE_MAX_BYTES"]:
             self.ui.draw([
                     "",
