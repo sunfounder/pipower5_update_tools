@@ -267,7 +267,7 @@ class Iap:
         for x in _send_data:
             _send_data_hex += f"{x:02X}, "
         _send_data_hex = _send_data_hex[:-2]
-        ui_obj.draw(f"send_data: {_send_data_hex}", location=(0, ui_obj._height))
+        ui_obj.draw(f"send_data: {_send_data_hex}", location=(0, ui_obj._height-1))
 
         status = IAP_NACK_ERR 
         for _ in range(IAP_RETRY_TIMES):

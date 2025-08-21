@@ -319,10 +319,10 @@ class IapToolApp:
         is_ok = False
 
         # ---- erasing ----
-        self.ui.draw(f"erasing ...", location=(0, self.ui._height-1))
+        self.ui.draw(f"erasing ...", location=(0, self.ui._height-2))
         _status = self.iap.earse_flash(data_len)
         if _status is True:
-            self.ui.draw(f"OK", location=(14, self.ui._height-1), color=self.ui.green)
+            self.ui.draw(f"OK", location=(14, self.ui._height-2), color=self.ui.green)
             time.sleep(1)
         else:
             self.ui.draw([
@@ -339,9 +339,9 @@ class IapToolApp:
             return
 
         # ---- burning ----
-        self.ui.draw(f"burning: ", location=(0, self.ui._height-1))
-        self.ui.draw_progress_bar(progress_perc, location=(9, self.ui._height-1), box_width=25)
-        self.ui.draw(f"{data_offset}/{data_len} ", location=(42, self.ui._height-1))
+        self.ui.draw(f"burning: ", location=(0, self.ui._height-2))
+        self.ui.draw_progress_bar(progress_perc, location=(9, self.ui._height-2), box_width=25)
+        self.ui.draw(f"{data_offset}/{data_len} ", location=(42, self.ui._height-2))
 
         while True:
             if data_offset > data_len - IAP_DATA_LEN:
@@ -361,24 +361,27 @@ class IapToolApp:
             progress_perc = int((data_offset)*100/data_len)
             if progress_perc > 100:
                 progress_perc = 100
-            self.ui.draw_progress_bar(progress_perc, location=(9, self.ui._height-1), box_width=25)
-            self.ui.draw(f"{data_offset}/{data_len} ", location=(42, self.ui._height-1))
+            self.ui.draw_progress_bar(progress_perc, location=(9, self.ui._height-2), box_width=25)
+            self.ui.draw(f"{data_offset}/{data_len} ", location=(42, self.ui._height-2))
 
             #
             if progress_perc == 100:
                 is_ok = True
+                self.ui.clear_xline(self.ui._height-1)
+                self.ui.clear_xline(self.ui._height)
                 break
             #
             time.sleep(0.01)
 
         if is_ok:
             # ---- verify ----
-            self.ui.draw(f"{' '*self.ui._width}", location=(0, self.ui._height-1))
-            self.ui.draw(f"verifying ...", location=(0, self.ui._height-1))
+            self.ui.draw(f"{' '*self.ui._width}", location=(0, self.ui._height-2))
+            self.ui.draw(f"verifying ...", location=(0, self.ui._height-2))
+
             _status = self.iap.verify_data(data)
             if _status is True:
                 is_ok = True
-                self.ui.draw(f"OK", location=(14, self.ui._height-1), color=self.ui.green)
+                self.ui.draw(f"OK", location=(14, self.ui._height-2), color=self.ui.green)
             else:
                 is_ok = False
                 self.ui.draw([
