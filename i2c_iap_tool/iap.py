@@ -226,6 +226,8 @@ class Iap:
                     break
                 except TimeoutError:
                     pass
+                except OSError:
+                    pass
                 time.sleep(0.01)
             
             # print(f"\nearse status: {status:#02x}")
@@ -277,6 +279,8 @@ class Iap:
                     status = self.boot_i2c._read_byte()
                     break
                 except TimeoutError:
+                    pass
+                except OSError:
                     pass
                 time.sleep(0.01)
 
