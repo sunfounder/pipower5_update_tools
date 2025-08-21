@@ -118,11 +118,11 @@ class IapToolApp:
 
     def display_currnet_mode(self, location=(UI_WIDTH-24, 7)):
         if self.iap.boot_i2c.is_ready():
-            self.ui.draw(f" Current Mode: Boot ", color=self.ui.white_on_green, location=location)
+            self.ui.draw(f" Current Mode: Boot ", color=self.ui.black_on_green, location=location)
         elif self.iap.app_i2c.is_ready():
-            self.ui.draw(f" Current Mode: App ", color=self.ui.white_on_green, location=location)
+            self.ui.draw(f" Current Mode: App ", color=self.ui.black_on_green, location=location)
         else:
-            self.ui.draw(f" Disconnected ", color=self.ui.white_on_red, location=location)
+            self.ui.draw(f" Disconnected ", color=self.ui.black_on_red, location=location)
         
     def select_operation_handler(self):
         operation = 0
@@ -186,7 +186,7 @@ class IapToolApp:
                     "",
                     "press any key to exit.  "
                     ],
-                    color=self.ui.white_on_red,
+                    color=self.ui.black_on_red,
                     location=(15, 5),
                     box_width=50,
                     align='center'
@@ -317,7 +317,7 @@ class IapToolApp:
                     "",
                     " press any key to exit. "
                     ],
-                    color=self.ui.white_on_red,
+                    color=self.ui.black_on_red,
                     location=(15, 5),
                     box_width=50,
                     align='center'
@@ -373,7 +373,7 @@ class IapToolApp:
                     "",
                     " press any key to exit. "
                     ],
-                    color=self.ui.white_on_red,
+                    color=self.ui.black_on_red,
                     location=(15, 5),
                     box_width=50,
                     align='center'
@@ -387,7 +387,7 @@ class IapToolApp:
                     "",
                     " Would you like to reboot the device? [y/n] "
                     ],
-                    color=self.ui.white_on_green,
+                    color=self.ui.black_on_green,
                     location=(15, 5),
                     box_width=50,
                     align='center'
@@ -402,7 +402,7 @@ class IapToolApp:
                     "",
                     " press any key to exit. "
                     ],
-                    color=self.ui.white_on_red,
+                    color=self.ui.black_on_red,
                     location=(15, 5),
                     box_width=50,
                     align='center'
@@ -435,7 +435,7 @@ class IapToolApp:
                     "",
                     " Would you like to reboot the device? [y/n] "
                     ],
-                    color=self.ui.white_on_green,
+                    color=self.ui.black_on_green,
                     location=(15, 5),
                     box_width=50,
                     align='center'
@@ -450,7 +450,7 @@ class IapToolApp:
                     "",
                     " press any key to exit. "
                     ],
-                    color=self.ui.white_on_red,
+                    color=self.ui.black_on_red,
                     location=(15, 5),
                     box_width=50,
                     align='center'
@@ -466,7 +466,7 @@ class IapToolApp:
                     "",
                     " press any key to exit. "
                     ],
-                    color=self.ui.white_on_green,
+                    color=self.ui.black_on_green,
                     location=(15, 5),
                     box_width=50,
                     align='center'
@@ -477,7 +477,7 @@ class IapToolApp:
                     "",
                     " press any key to exit. "
                     ],
-                    color=self.ui.white_on_red,
+                    color=self.ui.black_on_red,
                     location=(15, 5),
                     box_width=50,
                     align='center'
@@ -518,7 +518,7 @@ class IapToolApp:
                     "Do you want to close them? [y/n]",
                     "",
                     ],
-                    color=self.ui.white_on_yellow,
+                    color=self.ui.black_on_yellow,
                     location=(15, 5),
                     box_width=50,
                     align='center'
@@ -530,7 +530,7 @@ class IapToolApp:
                     "",
                     "",
                     ],
-                    color=self.ui.white_on_yellow,
+                    color=self.ui.black_on_yellow,
                     location=(15, 5),
                     box_width=50,
                     align='center'
@@ -548,7 +548,7 @@ class IapToolApp:
                         "",
                         " press any key to exit. "
                         ],
-                        color=self.ui.white_on_red,
+                        color=self.ui.black_on_red,
                         location=(15, 5),
                         box_width=50,
                         align='center'
@@ -586,7 +586,7 @@ class IapToolApp:
                     f"Would you like to reboot the device? [y/n]",
                     "",
                     ],
-                    color=self.ui.white_on_green,
+                    color=self.ui.black_on_green,
                     location=(15, 5),
                     box_width=50,
                     align='center'
@@ -609,7 +609,7 @@ class IapToolApp:
                     "",
                     " press any key to exit. "
                     ],
-                    color=self.ui.white_on_red,
+                    color=self.ui.black_on_red,
                     location=(5, 5),
                     box_width=70,
                     align='left'
@@ -622,7 +622,7 @@ class IapToolApp:
                         f"to exit boot mode? [y/n]",
                         "",
                         ],
-                        color=self.ui.white_on_green,
+                        color=self.ui.black_on_green,
                         location=(15, 5),
                         box_width=50,
                         align='center'
