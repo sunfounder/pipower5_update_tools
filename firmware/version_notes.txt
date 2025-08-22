@@ -1,4 +1,7 @@
 
 
+# 2.0.8 - 2025-08-22
+- disable startup buzzer sound
+
 # 2.0.7 - 2025-08-21
 - test for upgradefirmware
