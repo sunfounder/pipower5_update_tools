@@ -1,4 +1,7 @@
-
+# 2.0.9 - 2025-09-18
+- This version is a secondary development based on Version 2.0.8 using EIDE.
+- The firmware name naming has been standardized.
+- [Fix] solves the problem of being unable to power on again after shutdown.
 
 # 2.0.8 - 2025-08-22
 - disable startup buzzer sound
